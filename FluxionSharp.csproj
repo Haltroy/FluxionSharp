@@ -2,7 +2,33 @@
 
     <PropertyGroup>
         <TargetFramework>netstandard2.0</TargetFramework>
+        <GeneratePackageOnBuild>true</GeneratePackageOnBuild>
+        <Title>FluxionSharp</Title>
+        <Description>C# library to write or read Fluxion format.</Description>
+        <PackageProjectUrl>https://github.com/haltroy/FluxionSharp</PackageProjectUrl>
+        <PackageLicenseUrl>https://github.com/Haltroy/FluxionSharp/blob/main/LICENSE</PackageLicenseUrl>
+        <PackageIcon>logo.png</PackageIcon>
+        <RepositoryUrl>https://github.com/haltroy/FluxionSharp</RepositoryUrl>
+        <RepositoryType>git</RepositoryType>
+        <PackageTags>fluxion node data markup format</PackageTags>
+        <PackageReadmeFile>README_NUGET.md</PackageReadmeFile>
+        <DebugType>embedded</DebugType>
+        <Authors>haltroy</Authors>
+        <Company>haltroy</Company>
+        <Version>1.0</Version>
+        <VersionPrefix>1.0</VersionPrefix>
     </PropertyGroup>
+
+    <ItemGroup>
+        <None Update="logo.png">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+        <None Update="README_NUGET.md">
+            <Pack>True</Pack>
+            <PackagePath>\</PackagePath>
+        </None>
+    </ItemGroup>
 
     <ItemGroup>
         <Compile Remove="FluxionSharp.Demo\**"/>
