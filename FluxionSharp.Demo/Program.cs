@@ -71,23 +71,25 @@ public static class Program
         // found on System.IO.Compression, System.Security.Cryptography
         // or a custom library.
 
-        using (var stream1 = new MemoryStream())
+        using (var stream = new MemoryStream())
         {
             // We can tell Fluxion to write to our stream.
 
-            // with: Fluxion.Write(rootNode, stream1);
+            // For our example, let's use the Fluxion 1.
+
+            // with: Fluxion.Write(rootNode, stream1, 1);
             // or
 
-            rootNode.Write(stream1, encoding);
+            rootNode.Write(stream, encoding, 1);
 
             // Save the size of our Fluxion file.
-            fluxion_size = stream1.Length;
+            fluxion_size = stream.Length;
 
             // Rewind the stream to the start.
-            stream1.Position = 0;
+            stream.Seek(0, SeekOrigin.Begin);
 
             // And we can start reading it again.
-            rootNode_Read = Fluxion.Read(stream1);
+            rootNode_Read = Fluxion.Read(stream);
         }
 
         // Let's check if each of our nodes are read correct.
@@ -97,8 +99,8 @@ public static class Program
         else
             Console.WriteLine(
                 $"Root Nodes are not same, {Environment.NewLine}"
-                    + $"    Name: {rootNode.Name} -> {rootNode_Read.Name} {Environment.NewLine}"
-                    + $"    Value: {rootNode.Value} -> {rootNode_Read.Value}"
+                + $"    Name: {rootNode.Name} -> {rootNode_Read.Name} {Environment.NewLine}"
+                + $"    Value: {rootNode.Value} -> {rootNode_Read.Value}"
             );
 
         // And let's do that to each of our node. But we should check if that child node exists before doing it.
@@ -116,8 +118,8 @@ public static class Program
             else
                 Console.WriteLine(
                     $"The first nodes are not same, {Environment.NewLine}"
-                        + $"    Name: {node1.Name} -> {node1_read.Name} {Environment.NewLine}"
-                        + $"    Value: {node1.Value} -> {node1_read.Value}"
+                    + $"    Name: {node1.Name} -> {node1_read.Name} {Environment.NewLine}"
+                    + $"    Value: {node1.Value} -> {node1_read.Value}"
                 );
 
             // Let's check the attributes as well.
@@ -153,8 +155,8 @@ public static class Program
                 else
                     Console.WriteLine(
                         $"The first nodes are not same, {Environment.NewLine}"
-                            + $"    Name: {node1_1.Name} -> {node1_1_read.Name} {Environment.NewLine}"
-                            + $"    Value: {node1_1.Value} -> {node1_1_read.Value}"
+                        + $"    Name: {node1_1.Name} -> {node1_1_read.Name} {Environment.NewLine}"
+                        + $"    Value: {node1_1.Value} -> {node1_1_read.Value}"
                     );
                 for (var attr_i = 0; attr_i < node1_1.Attributes.Count; attr_i++)
                     if (node1_1.Attributes[attr_i] is { } attr1)
@@ -226,14 +228,23 @@ public static class Program
 
         var ymlSize = encoding.GetBytes(yml).Length;
 
-        // Finally, let's print them all out to the
+        // Let's encode it with a newer (or current) Fluxion version.
+        long flx2size;
+        using (var stream = new MemoryStream())
+        {
+            rootNode.Write(stream, encoding);
+            flx2size = stream.Length;
+        }
+
+        // Finally, let's print them all out to the console.
 
         Console.WriteLine(
             $"Sizes (in bytes) {Environment.NewLine}"
-                + $"  - Fluxion: {fluxion_size} {Environment.NewLine}"
-                + $"  - XML: {xmlSize} {Environment.NewLine}"
-                + $"  - JSON: {jsonSize} {Environment.NewLine}"
-                + $"  - YML: {ymlSize} {Environment.NewLine}"
+            + $"  - Fluxion (v1): {fluxion_size} {Environment.NewLine}"
+            + $"  - Fluxion (v{Fluxion.Version}): {flx2size} {Environment.NewLine}"
+            + $"  - XML: {xmlSize} {Environment.NewLine}"
+            + $"  - JSON: {jsonSize} {Environment.NewLine}"
+            + $"  - YML: {ymlSize} {Environment.NewLine}"
         );
 
         #endregion Section 3 - Comparison with other nodal languages

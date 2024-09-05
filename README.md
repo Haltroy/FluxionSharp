@@ -7,6 +7,8 @@ This library is written in C# native and features no extra libraries to work.
 
 This library should be compatible with trimming and native ahead-of-time compiling.
 
+This library has support for both v1 and v2 versions of Fluxion format.
+
 This library (as for all Fluxion libraries) is released under GNU GPL v3 license. [Click here](./LICENSE) to see the
 license.
 
@@ -28,7 +30,9 @@ FluxionSharp is made with .NET Standard 2.0. It should be supported by these fra
 Requires .NET SDK (any version). The example project requires the latest supported versions of .NET to be as up-to-date
 as possible.
 
-1. Clone this repository by either [downloading as ZIP](https://github.com/Haltroy/FluxionSharp/archive/refs/heads/main.zip), using GitHub Desktop or
+1. Clone this repository by
+   either [downloading as ZIP](https://github.com/Haltroy/FluxionSharp/archive/refs/heads/main.zip), using GitHub
+   Desktop or
    using `git clone https://github.com/haltroy/FluxionSharp.git` command.
 2. Open up a terminal in the folder of FluxionSharp or navigate a terminal with commands such as "cd".
 3. Use `dotnet build` to build FluxionSharp. You can use IDEs such as Visual Studio, Vİsual Studio Code, Rider etc. to
