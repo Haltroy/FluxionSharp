@@ -21,7 +21,7 @@ jobs:
         run: dotnet build --no-restore ./FluxionTest/FluxionTest.csproj
       - name: Test Fluxion
         run: |
-          ./FluxionTest/FluxionTest/bin/Debug/net8.0/FluxionTest -- -no-progress > ./result.txt
+          dotnet run --project ./FluxionTest/FluxionTest.csproj -- --no-progress > ./result.txt
       - name: Upload Artifact
         uses: actions/upload-artifact@v4
         with:
