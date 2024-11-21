@@ -31,30 +31,40 @@ namespace FluxionSharp
         #region Read
 
         /// <summary>
-        ///     Reads <paramref name="stream" /> as Fluxion nodes.
+        ///     Read a Fluxion formatted file or stream.
         /// </summary>
-        /// <param name="stream">Stream to read.</param>
+        /// <param name="options">Options for reading.</param>
         /// <returns>A root <see cref="FluxionNode" />.</returns>
         /// <exception cref="FluxionInvalidHeaderException">
-        ///     Exception thrown if the <paramref name="stream" /> does not start with
+        ///     Exception thrown if the <paramref name="options.Stream" /> does not start with
         ///     "FLX".
         /// </exception>
         /// <exception cref="FluxionEndOfStreamException">
         ///     Exception thrown if the end of the stream is reached but expected more
         ///     data.
         /// </exception>
-        public static FluxionNode Read(Stream stream)
+        /// <exception cref="FluxionException">
+        /// Other misc. exceptions.
+        /// </exception>
+        public static FluxionNode Read(FluxionReadOptions options)
         {
+            if (options.Stream is null)
+            {
+                if (string.IsNullOrWhiteSpace(options.File) || !File.Exists(options.File))
+                    throw new FileNotFoundException(options.File);
+                options.Stream = new FileStream(options.File, options.FileMode, options.FileAccess, options.FileShare);
+            }
+
             var root = new FluxionNode { IsRoot = true, Version = Version };
 
-            var byteF = stream.ReadByte();
-            var byteL = stream.ReadByte();
-            var byteX = stream.ReadByte();
+            var byteF = options.Stream.ReadByte();
+            var byteL = options.Stream.ReadByte();
+            var byteX = options.Stream.ReadByte();
 
             if (byteF != FluxionMark[0] && byteL != FluxionMark[1] && byteX != FluxionMark[2])
                 throw new FluxionInvalidHeaderException();
 
-            var versionByte = stream.ReadByte();
+            var versionByte = options.Stream.ReadByte();
             if (versionByte == -1)
                 throw new FluxionEndOfStreamException();
 
@@ -63,23 +73,23 @@ namespace FluxionSharp
             {
                 case 1:
                 {
-                    var encodingByte = stream.ReadByte();
+                    var encodingByte = options.Stream.ReadByte();
                     if (encodingByte == -1)
                         throw new FluxionEndOfStreamException();
-                    root = ReadRecurse_V1(stream, GetEncoding((byte)encodingByte), root, true);
+                    root = ReadRecurse_V1(options, GetEncoding((byte)encodingByte), root, true);
                 }
                     break;
                 case 2:
                 {
-                    var encodingByte = stream.ReadByte();
+                    var encodingByte = options.Stream.ReadByte();
                     if (encodingByte == -1)
                         throw new FluxionEndOfStreamException();
-                    root = ReadRecurse_V2(stream, GetEncoding((byte)encodingByte), root, true);
+                    root = ReadRecurse_V2(options, GetEncoding((byte)encodingByte), root, true);
                 }
                     break;
 
                 case 3:
-                    root = ReadV3(stream);
+                    root = ReadV3(options);
                     break;
 
                 default:
@@ -90,42 +100,25 @@ namespace FluxionSharp
             return root;
         }
 
-        /// <summary>
-        ///     Reads a Fluxion root node from a file.
-        /// </summary>
-        /// <param name="fileName">The path to the file.</param>
-        /// <param name="fileShare">Determines if the file should be accessed by other processes.</param>
-        /// <returns>A root <see cref="FluxionNode" />.</returns>
-        /// <exception cref="FileNotFoundException">Exception thrown if file was not found.</exception>
-        public static FluxionNode Read(string fileName, FileShare fileShare = FileShare.ReadWrite)
-        {
-            if (!File.Exists(fileName))
-                throw new FileNotFoundException($"File \"{fileName}\" was not found.");
-            using (var fs = new FileStream(fileName, FileMode.Open, FileAccess.Read, fileShare))
-            {
-                return Read(fs);
-            }
-        }
-
         #region Fluxion 3
 
-        private static FluxionNode ReadV3(Stream stream)
+        private static FluxionNode ReadV3(FluxionReadOptions options)
         {
-            var itemCount = DecodeVarInt(stream);
-            var dataCount = DecodeVarInt(stream);
+            var itemCount = DecodeVarInt(options.Stream);
+            var dataCount = DecodeVarInt(options.Stream);
             var dataArray = new object[dataCount];
             var f3Items = new FluxionItem[itemCount];
 
             for (var i = 0; i < dataCount; i++)
             {
-                var dataType = stream.ReadByte();
-                dataArray[i] = ReadBytesFromType_V3(stream, dataType);
+                var dataType = options.Stream.ReadByte();
+                dataArray[i] = ReadBytesFromType_V3(options.Stream, dataType);
             }
 
             for (var i = 0; i < f3Items.Length; i++)
             {
                 FluxionItem result;
-                var type = stream.ReadByte();
+                var type = options.Stream.ReadByte();
                 if (type < 0) throw new FluxionEndOfStreamException();
                 var isReference = IsBitSet(type, 0);
                 var isAttribute = IsBitSet(type, 1);
@@ -137,8 +130,8 @@ namespace FluxionSharp
                 var refCount = 1;
                 if (isReference)
                 {
-                    refId = DecodeVarInt(stream);
-                    refCount = DecodeVarInt(stream);
+                    refId = DecodeVarInt(options.Stream);
+                    refCount = DecodeVarInt(options.Stream);
                 }
 
                 if (isAttribute)
@@ -164,7 +157,7 @@ namespace FluxionSharp
 
                 if (hasName)
                 {
-                    result.NameId = DecodeVarInt(stream);
+                    result.NameId = DecodeVarInt(options.Stream);
                     if (dataArray[result.NameId] is string n) result.Name = n;
                 }
 
@@ -172,12 +165,12 @@ namespace FluxionSharp
                 {
                     if (!isAttribute)
                     {
-                        var valueType = stream.ReadByte();
+                        var valueType = options.Stream.ReadByte();
                         if (valueType < 0) throw new FluxionEndOfStreamException();
                         result.ValueType = (byte)valueType;
                     }
 
-                    result.ValueId = DecodeVarInt(stream);
+                    result.ValueId = DecodeVarInt(options.Stream);
                     var data = dataArray[result.ValueId];
                     if (GetValueType_V2(data) != result.ValueType)
                         throw new FluxionValueTypeMismatchException(result.ValueType, GetValueType_V2(data));
@@ -188,17 +181,17 @@ namespace FluxionSharp
                 {
                     if (hasChildren)
                     {
-                        var count = DecodeVarInt(stream);
+                        var count = DecodeVarInt(options.Stream);
                         for (var ci = 0; ci < count; ci++)
-                            if (f3Items[DecodeVarInt(stream)] is FluxionNode child)
+                            if (f3Items[DecodeVarInt(options.Stream)] is FluxionNode child)
                                 node.Add(child);
                     }
 
                     if (hasAttributes)
                     {
-                        var count = DecodeVarInt(stream);
+                        var count = DecodeVarInt(options.Stream);
                         for (var ai = 0; ai < count; ai++)
-                            if (f3Items[DecodeVarInt(stream)] is FluxionAttribute attribute)
+                            if (f3Items[DecodeVarInt(options.Stream)] is FluxionAttribute attribute)
                                 node.Attributes.Add(attribute);
                     }
                 }
@@ -206,11 +199,11 @@ namespace FluxionSharp
                 for (var di = 0; di < result.ReferenceCount; di++)
                 {
                     f3Items[i] = result.FullClone();
-                    if (result.ReferenceCount > 1 && di != result.ReferenceCount -1) i++;
+                    if (result.ReferenceCount > 1 && di != result.ReferenceCount - 1) i++;
                 }
             }
 
-            var rootId = DecodeVarInt(stream);
+            var rootId = DecodeVarInt(options.Stream);
             if (!(f3Items[rootId] is FluxionNode root))
                 throw new FluxionUnexpectedItemTypeException(rootId, "node");
             root.IsRoot = true;
@@ -222,7 +215,7 @@ namespace FluxionSharp
         #region Fluxion 2
 
         private static FluxionNode ReadRecurse_V2(
-            Stream stream,
+            FluxionReadOptions options,
             Encoding encoding,
             FluxionNode rootNode,
             bool readRoot = false
@@ -230,13 +223,13 @@ namespace FluxionSharp
         {
             if (readRoot)
             {
-                var treeMarkStart = DecodeVarLong(stream);
-                stream.Seek(treeMarkStart, SeekOrigin.Begin);
+                var treeMarkStart = DecodeVarLong(options.Stream);
+                options.Stream.Seek(treeMarkStart, SeekOrigin.Begin);
             }
 
             var node = readRoot ? rootNode : new FluxionNode { IsRoot = false, Parent = rootNode };
 
-            var valueType = stream.ReadByte();
+            var valueType = options.Stream.ReadByte();
             if (valueType == -1)
                 throw new FluxionEndOfStreamException();
 
@@ -250,27 +243,27 @@ namespace FluxionSharp
             valueType -= uniqueFlag ? 128 : 0;
 
             var childrenCount = 0;
-            if (!noChild) childrenCount = DecodeVarInt(stream);
+            if (!noChild) childrenCount = DecodeVarInt(options.Stream);
 
             if (hasName)
             {
-                var namePos = DecodeVarLong(stream);
-                var pos = stream.Position;
-                stream.Seek(namePos, SeekOrigin.Begin);
-                node.Name = encoding.GetString(DecodeByteArrWithVarInt(stream));
-                stream.Seek(pos, SeekOrigin.Begin);
+                var namePos = DecodeVarLong(options.Stream);
+                var pos = options.Stream.Position;
+                options.Stream.Seek(namePos, SeekOrigin.Begin);
+                node.Name = encoding.GetString(DecodeByteArrWithVarInt(options.Stream));
+                options.Stream.Seek(pos, SeekOrigin.Begin);
             }
 
-            node.Value = ReadBytesFromType_V2(stream, valueType, encoding, uniqueFlag);
+            node.Value = ReadBytesFromType_V2(options.Stream, valueType, encoding, uniqueFlag);
 
             if (!noAttr)
             {
-                var attrCount = DecodeVarInt(stream);
+                var attrCount = DecodeVarInt(options.Stream);
 
                 for (var i = 0; i < attrCount; i++)
                 {
                     var attr = new FluxionAttribute();
-                    var attrValueType = stream.ReadByte();
+                    var attrValueType = options.Stream.ReadByte();
                     if (attrValueType == -1)
                         throw new FluxionEndOfStreamException();
 
@@ -282,14 +275,14 @@ namespace FluxionSharp
 
                     if (attrHasName)
                     {
-                        var namePos = DecodeVarLong(stream);
-                        var pos = stream.Position;
-                        stream.Seek(namePos, SeekOrigin.Begin);
-                        attr.Name = encoding.GetString(DecodeByteArrWithVarInt(stream));
-                        stream.Seek(pos, SeekOrigin.Begin);
+                        var namePos = DecodeVarLong(options.Stream);
+                        var pos = options.Stream.Position;
+                        options.Stream.Seek(namePos, SeekOrigin.Begin);
+                        attr.Name = encoding.GetString(DecodeByteArrWithVarInt(options.Stream));
+                        options.Stream.Seek(pos, SeekOrigin.Begin);
                     }
 
-                    attr.Value = ReadBytesFromType_V2(stream, attrValueType, encoding, attrUniqueFlag);
+                    attr.Value = ReadBytesFromType_V2(options.Stream, attrValueType, encoding, attrUniqueFlag);
 
                     node.Attributes.Add(attr);
                 }
@@ -298,7 +291,7 @@ namespace FluxionSharp
             if (noChild) return node;
 
             for (var i = 0; i < childrenCount; i++)
-                node.Add(ReadRecurse_V2(stream, encoding, node));
+                node.Add(ReadRecurse_V2(options, encoding, node));
 
 
             return node;
@@ -309,7 +302,7 @@ namespace FluxionSharp
         #region Fluxion 1
 
         private static FluxionNode ReadRecurse_V1(
-            Stream stream,
+            FluxionReadOptions options,
             Encoding encoding,
             FluxionNode rootNode,
             bool readRoot = false
@@ -317,7 +310,7 @@ namespace FluxionSharp
         {
             var node = readRoot ? rootNode : new FluxionNode { IsRoot = false, Parent = rootNode };
 
-            var valueType = stream.ReadByte();
+            var valueType = options.Stream.ReadByte();
             if (valueType == -1)
                 throw new FluxionEndOfStreamException();
 
@@ -331,21 +324,21 @@ namespace FluxionSharp
 
             // Get Child Count
             var childrenCount = 0;
-            if (!noChild) childrenCount = DecodeVarInt(stream);
+            if (!noChild) childrenCount = DecodeVarInt(options.Stream);
 
-            if (hasName) node.Name = encoding.GetString(DecodeByteArrWithVarInt(stream));
+            if (hasName) node.Name = encoding.GetString(DecodeByteArrWithVarInt(options.Stream));
 
             // Read value here
-            node.Value = ReadBytesFromType(stream, valueType, encoding);
+            node.Value = ReadBytesFromType(options.Stream, valueType, encoding);
 
             if (!noAttr)
             {
-                var attrCount = DecodeVarInt(stream);
+                var attrCount = DecodeVarInt(options.Stream);
 
                 for (var i = 0; i < attrCount; i++)
                 {
                     var attr = new FluxionAttribute();
-                    var attrValueType = stream.ReadByte();
+                    var attrValueType = options.Stream.ReadByte();
                     if (attrValueType == -1)
                         throw new FluxionEndOfStreamException();
 
@@ -354,11 +347,11 @@ namespace FluxionSharp
 
                     if (attrHasName)
                     {
-                        var attrNameBytes = DecodeByteArrWithVarInt(stream);
+                        var attrNameBytes = DecodeByteArrWithVarInt(options.Stream);
                         attr.Name = encoding.GetString(attrNameBytes);
                     }
 
-                    attr.Value = ReadBytesFromType(stream, attrValueType, encoding);
+                    attr.Value = ReadBytesFromType(options.Stream, attrValueType, encoding);
 
                     node.Attributes.Add(attr);
                 }
@@ -367,7 +360,7 @@ namespace FluxionSharp
             if (noChild) return node;
             {
                 for (var i = 0; i < childrenCount; i++)
-                    node.Add(ReadRecurse_V1(stream, encoding, node));
+                    node.Add(ReadRecurse_V1(options, encoding, node));
             }
 
             return node;
@@ -402,11 +395,11 @@ namespace FluxionSharp
                         continue;
 
                     case 1:
-                        Write_V1(node, options.Stream, options.Encoding, true);
+                        Write_V1(node, options, options.Encoding, true);
                         break;
 
                     case 2:
-                        Write_V2(node, options.Stream, options.Encoding, true, Array.Empty<AnalyzedDataContent>());
+                        Write_V2(node, options, options.Encoding, true, Array.Empty<AnalyzedDataContent>());
                         break;
 
                     case 3:
@@ -637,12 +630,9 @@ namespace FluxionSharp
 
                     item.IsReference = true;
                     item.ReferenceId = uniqueItems.IndexOf(existingItem);
-                    uniqueItems.Add(item);
                 }
-                else
-                {
-                    uniqueItems.Add(item);
-                }
+
+                uniqueItems.Add(item);
             }
 
             return uniqueItems.ToArray();
@@ -690,8 +680,10 @@ namespace FluxionSharp
 
 
             // Write attributes and nodes to stream
-            foreach (var f3Item in list)
+            for (var i = 0; i < list.Length; i++)
             {
+                options.OnProgressChanged(root,list.Length, i);
+                var f3Item = list[i];
                 byte type = 0;
                 type += f3Item.IsReference ? (byte)1 : (byte)0;
                 type += f3Item is FluxionAttribute ? (byte)2 : (byte)0;
@@ -729,6 +721,8 @@ namespace FluxionSharp
                 }
 
                 if (!(f3Item is FluxionNode node)) continue;
+                // TODO: Figure out a way to detect that this is incremental.
+                // TODO: Diff the nodes from referenced if COpyChildren is true and only care about diff children.
                 if (node.Count > 0)
                 {
                     WriteVarInt(options.Stream, node.Count);
@@ -880,7 +874,7 @@ namespace FluxionSharp
 
         private static void Write_V2(
             this FluxionNode node,
-            Stream stream,
+            FluxionWriteOptions options,
             Encoding encoding,
             bool asRoot,
             AnalyzedDataContent[] analyticsData
@@ -898,21 +892,21 @@ namespace FluxionSharp
                 node.Version = 2;
 
                 // Write FLX on top of the file.
-                stream.Write(FluxionMark, 0, FluxionMark.Length);
+                options.Stream.Write(FluxionMark, 0, FluxionMark.Length);
 
                 // Write version
-                stream.WriteByte(node.Version);
+                options.Stream.WriteByte(node.Version);
 
                 // Write Encoding
-                stream.WriteByte(GetEncodingId(encoding));
+                options.Stream.WriteByte(GetEncodingId(encoding));
 
                 // Estimate Data Size
                 var dataPos = new List<AnalyzedDataContent>();
                 var dataSize = Estimate_V2(node, encoding, ref dataPos);
-                var dataEndPos = stream.Position + EstimateValueSize_V2(dataSize, encoding) + dataSize;
-                WriteVarLong(stream, dataEndPos);
+                var dataEndPos = options.Stream.Position + EstimateValueSize_V2(dataSize, encoding) + dataSize;
+                WriteVarLong(options.Stream, dataEndPos);
 
-                var dataEndPos2 = WriteData_V2(stream, encoding, ref dataPos);
+                var dataEndPos2 = WriteData_V2(options.Stream, encoding, ref dataPos);
                 if (dataEndPos2 != dataEndPos)
                     throw new FluxionEstimationError(dataEndPos, dataEndPos2);
                 analyticsData = dataPos.ToArray();
@@ -957,20 +951,20 @@ namespace FluxionSharp
                 valueType = (byte)(valueType ^ 128); // Unique flag
 
             // Write the type.
-            stream.WriteByte(valueType);
+            options.Stream.WriteByte(valueType);
 
             // Node Children count (only if node has children).
-            if (node.Count > 0) WriteVarInt(stream, node.Count);
+            if (node.Count > 0) WriteVarInt(options.Stream, node.Count);
 
             // Node Name (only if it has one).
             if (!string.IsNullOrWhiteSpace(node.Name) && nodeAn0 != null)
-                WriteVarLong(stream, nodeAn0.Position);
+                WriteVarLong(options.Stream, nodeAn0.Position);
 
             // Write data position (if not null, or bool)
             if (nodeAd0 != null)
-                WriteVarLong(stream, nodeAd0.Position);
+                WriteVarLong(options.Stream, nodeAd0.Position);
 
-            if (node.Attributes.Count > 0) WriteVarInt(stream, node.Attributes.Count);
+            if (node.Attributes.Count > 0) WriteVarInt(options.Stream, node.Attributes.Count);
 
             // Same thing here.
             foreach (var attr in node.Attributes)
@@ -1009,20 +1003,20 @@ namespace FluxionSharp
                     valueType = (byte)(valueType ^ 128); // Unique flag
 
                 // Write the value type.
-                stream.WriteByte(attrValueType);
+                options.Stream.WriteByte(attrValueType);
 
                 // Check if attribute has name, if it has one then write position.
                 if (!string.IsNullOrWhiteSpace(attr.Name) && attrAn0 != null)
-                    WriteVarLong(stream, attrAn0.Position);
+                    WriteVarLong(options.Stream, attrAn0.Position);
 
                 // Write the value position.
                 if (attrAd0 != null)
-                    WriteVarLong(stream, attrAd0.Position);
+                    WriteVarLong(options.Stream, attrAd0.Position);
             }
 
             // Recursion: Write other nodes (not as root node).
             foreach (var childNode in node.Children)
-                Write_V2(childNode, stream, encoding, false, analyticsData);
+                Write_V2(childNode, options, encoding, false, analyticsData);
         }
 
         #endregion Fluxion 2
@@ -1031,7 +1025,7 @@ namespace FluxionSharp
 
         private static void Write_V1(
             this FluxionNode node,
-            Stream stream,
+            FluxionWriteOptions options,
             Encoding encoding,
             bool asRoot
         )
@@ -1047,13 +1041,13 @@ namespace FluxionSharp
                 node.Version = 1;
 
                 // Write FLX to top of the file.
-                stream.Write(FluxionMark, 0, FluxionMark.Length);
+                options.Stream.Write(FluxionMark, 0, FluxionMark.Length);
 
                 // Write version
-                stream.WriteByte(node.Version);
+                options.Stream.WriteByte(node.Version);
 
                 // Write Encoding
-                stream.WriteByte(GetEncodingId(encoding));
+                options.Stream.WriteByte(GetEncodingId(encoding));
             }
 
             // Get value type
@@ -1068,30 +1062,30 @@ namespace FluxionSharp
                 valueType = (byte)(valueType ^ 64); // No Attributes
 
             // Write the type.
-            stream.WriteByte(valueType);
+            options.Stream.WriteByte(valueType);
 
             // Node Children count (only if node has children).
-            if (node.Count > 0) WriteVarInt(stream, node.Count);
+            if (node.Count > 0) WriteVarInt(options.Stream, node.Count);
 
             // Node Name (only if it has one), encoding first then length then name.
             if (!string.IsNullOrWhiteSpace(node.Name))
-                WriteByteArrWithVarInt(stream, encoding.GetBytes(node.Name));
+                WriteByteArrWithVarInt(options.Stream, encoding.GetBytes(node.Name));
 
             switch (node.Value)
             {
                 // Check if the value is string, or byte array for variable-length encoding.
                 case string stringValue:
-                    WriteByteArrWithVarInt(stream, encoding.GetBytes(stringValue));
+                    WriteByteArrWithVarInt(options.Stream, encoding.GetBytes(stringValue));
                     break;
                 case byte[] _:
-                    WriteByteArrWithVarInt(stream, value);
+                    WriteByteArrWithVarInt(options.Stream, value);
                     break;
                 default:
-                    stream.Write(value, 0, value.Length);
+                    options.Stream.Write(value, 0, value.Length);
                     break;
             }
 
-            if (node.Attributes.Count > 0) WriteVarInt(stream, node.Attributes.Count);
+            if (node.Attributes.Count > 0) WriteVarInt(options.Stream, node.Attributes.Count);
 
             // Same thing here.
             foreach (var attr in node.Attributes)
@@ -1104,25 +1098,25 @@ namespace FluxionSharp
                     attrValueType = (byte)(attrValueType ^ 16);
 
                 // Write the value.
-                stream.WriteByte(attrValueType);
+                options.Stream.WriteByte(attrValueType);
 
                 // Check if attribute has name, if it has one then write encoding, length and the name.
                 if (!string.IsNullOrWhiteSpace(attr.Name))
-                    WriteByteArrWithVarInt(stream, encoding.GetBytes(attr.Name));
+                    WriteByteArrWithVarInt(options.Stream, encoding.GetBytes(attr.Name));
 
                 switch (attr.Value)
                 {
                     // Check if the value is string, or byte array for variable-length encoding.
                     case string attrString:
-                        WriteByteArrWithVarInt(stream, encoding.GetBytes(attrString));
+                        WriteByteArrWithVarInt(options.Stream, encoding.GetBytes(attrString));
                         break;
                     case byte[] attByteArray:
-                        WriteByteArrWithVarInt(stream, attByteArray);
+                        WriteByteArrWithVarInt(options.Stream, attByteArray);
                         break;
                     default:
                     {
                         if (attrValue.Length > 0) // Only write if value is not null, bool, etc.
-                            stream.Write(attrValue, 0, attrValue.Length);
+                            options.Stream.Write(attrValue, 0, attrValue.Length);
                         break;
                     }
                 }
@@ -1130,7 +1124,7 @@ namespace FluxionSharp
 
             // Recursion: Write other nodes (not as root node).
             foreach (var childNode in node.Children)
-                Write_V1(childNode, stream, encoding, false);
+                Write_V1(childNode, options, encoding, false);
         }
 
         #endregion Fluxion 1
@@ -2259,20 +2253,155 @@ namespace FluxionSharp
     #endregion Fluxion
 
     #region Read/Write Options
-
-    public class FluxionWriteOptions
+    
+    /// <summary>
+    /// Interface for common things inside of Read/Write options classes.
+    /// </summary>
+    public class FluxionReadWrite
     {
+        /// <summary>
+        /// Event arguments for progress changed while reading/writing.
+        /// </summary>
+        public class FluxionProgressChangedEventArgs : EventArgs
+        {
+            /// <summary>
+            /// Creates a new <see cref="FluxionProgressChangedEventArgs"/>.
+            /// </summary>
+            /// <param name="total">Total nodes count.</param>
+            /// <param name="current">Current nodes count.</param>
+            public FluxionProgressChangedEventArgs(int total, int current)
+            {
+                Total = total;
+                Current = current;
+            }
+            /// <summary>
+            /// Total nodes count.
+            /// </summary>
+            // ReSharper disable once UnusedAutoPropertyAccessor.Global
+            public int Total { get; internal set; }
+            /// <summary>
+            /// Current nodes count.
+            /// </summary>
+            // ReSharper disable once UnusedAutoPropertyAccessor.Global
+            public int Current { get; internal set; }
+        }
+        public event EventHandler<FluxionProgressChangedEventArgs> ProgressChanged;
+
+        internal void OnProgressChanged(object sender, FluxionProgressChangedEventArgs e)
+        {
+            ProgressChanged?.Invoke(sender, e);
+        }
+
+        internal void OnProgressChanged(object sender, int total, int current)
+        {
+            ProgressChanged?.Invoke(sender, new FluxionProgressChangedEventArgs(total, current));
+        }
+    }
+
+    /// <summary>
+    /// Options for reading a Fluxion formatted file or stream.
+    /// </summary>
+    public  class FluxionReadOptions : FluxionReadWrite
+    {
+        /// <summary>
+        /// Stream to read from.
+        /// </summary>
         public Stream Stream { get; set; }
 
+        /// <summary>
+        /// File to read from.
+        /// </summary>
         // ReSharper disable once UnusedAutoPropertyAccessor.Global
         public string File { get; set; }
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileMode"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public FileMode FileMode { get; set; } = FileMode.Create;
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileAccess"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public FileAccess FileAccess { get; set; } = FileAccess.Write;
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileShare"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public FileShare FileShare { get; set; } = FileShare.ReadWrite;
+    }
+
+    /// <summary>
+    /// Options for writing a Fluxion node as root to a file or stream.
+    /// </summary>
+    public class FluxionWriteOptions : FluxionReadWrite
+    {
+        /// <summary>
+        /// Stream to write on.
+        /// </summary>
+        public Stream Stream { get; set; }
+
+        /// <summary>
+        /// File to write on.
+        /// </summary>
+        // ReSharper disable once UnusedAutoPropertyAccessor.Global
+        public string File { get; set; }
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileMode"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+        public FileMode FileMode { get; set; } = FileMode.Create;
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileAccess"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+        public FileAccess FileAccess { get; set; } = FileAccess.Write;
+
+        /// <summary>
+        /// <inheritdoc cref="System.IO.FileShare"/>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
+        public FileShare FileShare { get; set; } = FileShare.ReadWrite;
+
+        /// <summary>
+        /// Determines the tolerance for float values.
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public float FloatTolerance { get; set; } = 0.001F;
+
+        /// <summary>
+        /// Determines the tolerance for double values.
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public double DoubleTolerance { get; set; } = 0.001D;
+
+        /// <summary>
+        /// Specifies the encoding to be used. Only effective on v1 and v2.
+        /// <list type="bullet|value">
+        /// <listheader>
+        ///  Fluxion supports these encodings:
+        /// </listheader>
+        /// <item><see cref="System.Text.Encoding.UTF8"/></item>
+        /// <item><see cref="System.Text.Encoding.Unicode"/></item>
+        /// <item><see cref="System.Text.Encoding.UTF32"/></item>
+        /// </list>
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public Encoding Encoding { get; set; } = Encoding.UTF8;
+
+        /// <summary>
+        /// Uses Reference nodes/attributes to make the file size smaller on repeating nodes. Only effective in v3.
+        /// </summary>
+        // ReSharper disable once AutoPropertyCanBeMadeGetOnly.Global
         public bool Optimize { get; set; } = true;
+
+        /// <summary>
+        /// Specifies the Fluxion version.
+        /// </summary>
         public byte Version { get; set; } = Fluxion.Version;
     }
 
@@ -2365,16 +2494,20 @@ namespace FluxionSharp
             return true;
         }
 
-        private static bool AreChildrenSubset(List<FluxionNode> children1, List<FluxionNode> children2,  float floatTolerance = 0.001F,
+        private static bool AreChildrenSubset(List<FluxionNode> children1, List<FluxionNode> children2,
+            float floatTolerance = 0.001F,
             double doubleTolerance = 0.001D)
         {
-            return children1.All(child1 => children2.Any(child2 => child1.IsDeepEqual(child2, floatTolerance, doubleTolerance)));
+            return children1.All(child1 =>
+                children2.Any(child2 => child1.IsDeepEqual(child2, floatTolerance, doubleTolerance)));
         }
 
-        private static bool AreAttributesSubset(List<FluxionAttribute> attributes1, List<FluxionAttribute> attributes2, float floatTolerance = 0.001F,
-        double doubleTolerance = 0.001D)
+        private static bool AreAttributesSubset(List<FluxionAttribute> attributes1, List<FluxionAttribute> attributes2,
+            float floatTolerance = 0.001F,
+            double doubleTolerance = 0.001D)
         {
-            return attributes1.All(attribute1 => attributes2.Any(attribute2 => attribute1.IsDeepEqual(attribute2, floatTolerance, doubleTolerance)));
+            return attributes1.All(attribute1 =>
+                attributes2.Any(attribute2 => attribute1.IsDeepEqual(attribute2, floatTolerance, doubleTolerance)));
         }
 
 
@@ -2416,23 +2549,6 @@ namespace FluxionSharp
         ///     Gets the total amount of child nodes of this node.
         /// </summary>
         public int Count => _children.Count;
-
-        public bool IsEqual(FluxionNode nodeToCheck, bool checkName, bool checkValue, float floatTolerance = 0.001F,
-            double doubleTolerance = 0.001D)
-        {
-            switch (checkName)
-            {
-                case false when !checkValue:
-                    return true;
-                case true when !checkValue:
-                    return nodeToCheck.Name == Name;
-                case false:
-                    return Fluxion.IsEqual(nodeToCheck.Value, Value, floatTolerance, doubleTolerance);
-                default:
-                    return nodeToCheck.Name == Name &&
-                           Fluxion.IsEqual(nodeToCheck.Value, Value, floatTolerance, doubleTolerance);
-            }
-        }
 
         /// <summary>
         ///     Clones this node.

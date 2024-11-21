@@ -93,7 +93,10 @@ public static class Program
             stream.Seek(0, SeekOrigin.Begin);
 
             // And we can start reading it again.
-            rootNodeRead = Fluxion.Read(stream);
+            rootNodeRead = Fluxion.Read(new FluxionReadOptions()
+            {
+                Stream = stream
+            });
         }
 
         // Let's check if each of our nodes are read correct.

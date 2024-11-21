@@ -7,7 +7,7 @@ This library is written in C# native and features no extra libraries to work.
 
 This library should be compatible with trimming and native ahead-of-time compiling.
 
-This library has support for both v1 and v2 versions of Fluxion format as well as the next version under the
+This library has support for all versions of Fluxion format as well as the next version under the
 [flx-next](https://github.com/Haltroy/FluxionSharp/tree/flx-next) branch.
 
 Please note that the `flx-next` branch is experimental. It is not recommended to be used in a production environment

@@ -233,7 +233,10 @@ public static class Program
         sw.Reset();
         stream.Seek(0, SeekOrigin.Begin);
         sw.Start();
-        Fluxion.Read(stream);
+        Fluxion.Read(new FluxionReadOptions()
+        {
+            Stream = stream
+        });
         sw.Stop();
         var readElapsed = sw.ElapsedMilliseconds;
         var rFinalMemory = Process.GetCurrentProcess().PrivateMemorySize64;
