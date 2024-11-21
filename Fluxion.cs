@@ -181,18 +181,47 @@ namespace FluxionSharp
                 {
                     if (hasChildren)
                     {
-                        var count = DecodeVarInt(options.Stream);
-                        for (var ci = 0; ci < count; ci++)
-                            if (f3Items[DecodeVarInt(options.Stream)] is FluxionNode child)
-                                node.Add(child);
+                        var childType = options.Stream.ReadByte();
+                        if (childType < 0) throw new FluxionEndOfStreamException();
+                        switch (childType)
+                        {
+                            case 0:
+                                var count = DecodeVarInt(options.Stream);
+                                for (var ci = 0; ci < count; ci++)
+                                    if (f3Items[DecodeVarInt(options.Stream)] is FluxionNode child)
+                                        node.Add(child);
+                                break;
+                            case 1:
+                                var smallestItem = DecodeVarInt(options.Stream);
+                                var biggestItem = DecodeVarInt(options.Stream);
+                                for (var ci = smallestItem; ci < biggestItem; ci++)
+                                    if (f3Items[ci] is FluxionNode child)
+                                        node.Add(child);
+                                break;
+                        }
                     }
 
                     if (hasAttributes)
                     {
-                        var count = DecodeVarInt(options.Stream);
-                        for (var ai = 0; ai < count; ai++)
-                            if (f3Items[DecodeVarInt(options.Stream)] is FluxionAttribute attribute)
-                                node.Attributes.Add(attribute);
+                        var attrType = options.Stream.ReadByte();
+                        if (attrType < 0) throw new FluxionEndOfStreamException();
+                        switch (attrType)
+                        {
+                            case 0:
+                                var count = DecodeVarInt(options.Stream);
+                                for (var ai = 0; ai < count; ai++)
+                                    if (f3Items[DecodeVarInt(options.Stream)] is FluxionAttribute attribute)
+                                        node.Attributes.Add(attribute);
+                                break;
+
+                            case 1:
+                                var smallestItem = DecodeVarInt(options.Stream);
+                                var biggestItem = DecodeVarInt(options.Stream);
+                                for (var ai = smallestItem; ai < biggestItem; ai++)
+                                    if (f3Items[ai] is FluxionAttribute attribute)
+                                        node.Attributes.Add(attribute);
+                                break;
+                        }
                     }
                 }
 
@@ -682,7 +711,7 @@ namespace FluxionSharp
             // Write attributes and nodes to stream
             for (var i = 0; i < list.Length; i++)
             {
-                options.OnProgressChanged(root,list.Length, i);
+                options.OnProgressChanged(root, list.Length, i);
                 var f3Item = list[i];
                 byte type = 0;
                 type += f3Item.IsReference ? (byte)1 : (byte)0;
@@ -721,19 +750,91 @@ namespace FluxionSharp
                 }
 
                 if (!(f3Item is FluxionNode node)) continue;
-                // TODO: Figure out a way to detect that this is incremental.
-                // TODO: Diff the nodes from referenced if COpyChildren is true and only care about diff children.
                 if (node.Count > 0)
                 {
-                    WriteVarInt(options.Stream, node.Count);
-                    foreach (var c in node.ChildrenIDs)
-                        WriteVarInt(options.Stream, c);
+                    var childrenIds = node.ChildrenIDs;
+                    if (node.IsReference && list[f3Item.ReferenceId] is FluxionNode refNode)
+                        childrenIds = node.ChildrenIDs.Except(refNode.ChildrenIDs).ToArray();
+
+                    var incremental = true;
+
+                    var lastItem = -1;
+                    var smallestItem = int.MaxValue;
+                    var biggestItem = -1;
+
+                    foreach (var id in childrenIds)
+                    {
+                        if (id < smallestItem) smallestItem = id;
+
+                        if (biggestItem < id) biggestItem = id;
+
+                        if (lastItem < 0)
+                        {
+                            lastItem = id;
+                            continue;
+                        }
+
+                        if (id - lastItem == 1) continue;
+                        incremental = false;
+                        break;
+                    }
+
+                    if (incremental)
+                    {
+                        options.Stream.WriteByte(1);
+                        WriteVarInt(options.Stream, smallestItem);
+                        WriteVarInt(options.Stream, biggestItem);
+                    }
+                    else
+                    {
+                        options.Stream.WriteByte(0);
+                        WriteVarInt(options.Stream, node.Count);
+                        foreach (var c in childrenIds)
+                            WriteVarInt(options.Stream, c);
+                    }
                 }
 
                 if (node.Attributes.Count <= 0) continue;
-                WriteVarInt(options.Stream, node.Attributes.Count);
-                foreach (var a in node.AttributesIDs)
-                    WriteVarInt(options.Stream, a);
+                var attrIds = node.AttributesIDs;
+                if (node.IsReference && list[node.ReferenceId] is FluxionNode refNode1)
+                    attrIds = node.AttributesIDs.Except(refNode1.AttributesIDs).ToArray();
+
+                var attrIncremental = true;
+
+                var lastAttrItem = -1;
+                var smallestAttrItem = int.MaxValue;
+                var biggestAttrItem = -1;
+
+                foreach (var id in attrIds)
+                {
+                    if (id < smallestAttrItem) smallestAttrItem = id;
+
+                    if (biggestAttrItem < id) biggestAttrItem = id;
+
+                    if (lastAttrItem < 0)
+                    {
+                        lastAttrItem = id;
+                        continue;
+                    }
+
+                    if (id - lastAttrItem == 1) continue;
+                    attrIncremental = false;
+                    break;
+                }
+
+                if (attrIncremental)
+                {
+                    options.Stream.WriteByte(1);
+                    WriteVarInt(options.Stream, smallestAttrItem);
+                    WriteVarInt(options.Stream, biggestAttrItem);
+                }
+                else
+                {
+                    options.Stream.WriteByte(0);
+                    WriteVarInt(options.Stream, node.Attributes.Count);
+                    foreach (var a in attrIds)
+                        WriteVarInt(options.Stream, a);
+                }
             }
 
             // Write the root node's ID to stream
@@ -2253,7 +2354,7 @@ namespace FluxionSharp
     #endregion Fluxion
 
     #region Read/Write Options
-    
+
     /// <summary>
     /// Interface for common things inside of Read/Write options classes.
     /// </summary>
@@ -2274,17 +2375,20 @@ namespace FluxionSharp
                 Total = total;
                 Current = current;
             }
+
             /// <summary>
             /// Total nodes count.
             /// </summary>
             // ReSharper disable once UnusedAutoPropertyAccessor.Global
             public int Total { get; internal set; }
+
             /// <summary>
             /// Current nodes count.
             /// </summary>
             // ReSharper disable once UnusedAutoPropertyAccessor.Global
             public int Current { get; internal set; }
         }
+
         public event EventHandler<FluxionProgressChangedEventArgs> ProgressChanged;
 
         internal void OnProgressChanged(object sender, FluxionProgressChangedEventArgs e)
@@ -2301,7 +2405,7 @@ namespace FluxionSharp
     /// <summary>
     /// Options for reading a Fluxion formatted file or stream.
     /// </summary>
-    public  class FluxionReadOptions : FluxionReadWrite
+    public class FluxionReadOptions : FluxionReadWrite
     {
         /// <summary>
         /// Stream to read from.
