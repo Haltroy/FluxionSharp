@@ -135,12 +135,7 @@ public static class Program
 
     private static int GetMinSize(string[] contents)
     {
-        var result = 0;
-        foreach (var c in contents)
-            if (c.Length > result)
-                result = c.Length;
-
-        return result;
+        return contents.Select(c => c.Length).Prepend(0).Max();
     }
 
     private static string Reformat(string before, int length, char filler = ' ')
@@ -207,7 +202,7 @@ public static class Program
                     ? GenerateRandomText()
                     : test
             };
-            if (inclAttr) node.Attributes.Add(new FluxionAttribute() { Name = "i", Value = i });
+            if (inclAttr) node.Attributes.Add(new FluxionAttribute { Name = "i", Value = i });
             fluxion.Add(node);
         }
 
@@ -233,7 +228,7 @@ public static class Program
         sw.Reset();
         stream.Seek(0, SeekOrigin.Begin);
         sw.Start();
-        Fluxion.Read(new FluxionReadOptions()
+        Fluxion.Read(new FluxionReadOptions
         {
             Stream = stream
         });
@@ -246,7 +241,7 @@ public static class Program
 
     private static Result Xml_Average(string test, bool progress, bool inclAttr, int count, int c)
     {
-        var template = $"\ud83d\udd5f XML %status%...";
+        const string template = "\ud83d\udd5f XML %status%...";
         var write = $"{template.Replace("%status%", $"(0/{c})")}";
         if (progress) Console.Write(write);
 
