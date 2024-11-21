@@ -6,7 +6,7 @@
         <Title>FluxionSharp</Title>
         <Description>C# library to write or read Fluxion format.</Description>
         <PackageProjectUrl>https://github.com/haltroy/FluxionSharp</PackageProjectUrl>
-        <PackageLicenseUrl>https://github.com/Haltroy/FluxionSharp/blob/main/LICENSE</PackageLicenseUrl>
+        <PackageLicenseExpression>GPL-3.0-only</PackageLicenseExpression>
         <PackageIcon>logo.png</PackageIcon>
         <RepositoryUrl>https://github.com/haltroy/FluxionSharp</RepositoryUrl>
         <RepositoryType>git</RepositoryType>
@@ -17,6 +17,7 @@
         <Company>haltroy</Company>
         <Version>2.0</Version>
         <VersionPrefix>2.0</VersionPrefix>
+        <EnforceCodeStyleInBuild>true</EnforceCodeStyleInBuild>
     </PropertyGroup>
 
     <ItemGroup>
@@ -28,12 +29,15 @@
             <Pack>True</Pack>
             <PackagePath>\</PackagePath>
         </None>
+        <None Remove="FluxionTest\**" />
     </ItemGroup>
 
     <ItemGroup>
         <Compile Remove="FluxionSharp.Demo\**"/>
         <EmbeddedResource Remove="FluxionSharp.Demo\**"/>
         <None Remove="FluxionSharp.Demo\**"/>
+        <Compile Remove="FluxionTest\**" />
+        <EmbeddedResource Remove="FluxionTest\**" />
     </ItemGroup>
 
 </Project>
