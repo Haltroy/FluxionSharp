@@ -768,13 +768,11 @@ namespace FluxionSharp
 
                         if (biggestItem < id) biggestItem = id;
 
-                        if (lastItem < 0)
+                        if (lastItem < 0 || id - lastItem == 1)
                         {
                             lastItem = id;
                             continue;
                         }
-
-                        if (id - lastItem == 1) continue;
                         incremental = false;
                         break;
                     }
@@ -811,13 +809,11 @@ namespace FluxionSharp
 
                     if (biggestAttrItem < id) biggestAttrItem = id;
 
-                    if (lastAttrItem < 0)
+                    if (lastAttrItem < 0 || id - lastAttrItem == 1)
                     {
                         lastAttrItem = id;
                         continue;
                     }
-
-                    if (id - lastAttrItem == 1) continue;
                     attrIncremental = false;
                     break;
                 }
