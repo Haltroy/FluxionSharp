@@ -48,21 +48,21 @@ public static class Program
 
         // Let's create another user under our first user.
 
-        var node1_1 = new FluxionNode { Name = "User", Value = "jeremy" };
+        var node11 = new FluxionNode { Name = "User", Value = "jeremy" };
 
-        node1_1.Attributes.Add(new FluxionAttribute { Name = "Age", Value = 10 });
+        node11.Attributes.Add(new FluxionAttribute { Name = "Age", Value = 10 });
 
-        node1.Add(node1_1);
+        node1.Add(node11);
 
         #endregion Section 1 - Create Information
 
         #region Section 2 - Store the Information
 
         // We need to tell the programming language that we are expecting a Fluxion node, so we need to define it here.
-        FluxionNode rootNode_Read;
+        FluxionNode rootNodeRead;
 
         // We also need to define the size here, so we can use it in Section 3.
-        long fluxion_size;
+        long fluxionSize;
 
         // Now we have some information to store into a place.
         // For that, we are going to store it in memory.
@@ -77,34 +77,41 @@ public static class Program
 
             // For our example, let's use the Fluxion 1.
 
-            // with: Fluxion.Write(rootNode, stream1, 1);
+            // with: Fluxion.Write(rootNode, stream, 1);
             // or
 
-            rootNode.Write(stream, encoding, 1);
+            rootNode.Write(new FluxionWriteOptions
+            {
+                Stream = stream,
+                Version = 1
+            });
 
             // Save the size of our Fluxion file.
-            fluxion_size = stream.Length;
+            fluxionSize = stream.Length;
 
             // Rewind the stream to the start.
             stream.Seek(0, SeekOrigin.Begin);
 
             // And we can start reading it again.
-            rootNode_Read = Fluxion.Read(stream);
+            rootNodeRead = Fluxion.Read(new FluxionReadOptions()
+            {
+                Stream = stream
+            });
         }
 
         // Let's check if each of our nodes are read correct.
 
-        if (rootNode.Name == rootNode_Read.Name && rootNode.Value == rootNode_Read.Value)
+        if (rootNode.Name == rootNodeRead.Name && rootNode.Value == rootNodeRead.Value)
             Console.WriteLine("Root Node names and values are same!");
         else
             Console.WriteLine(
                 $"Root Nodes are not same, {Environment.NewLine}"
-                + $"    Name: {rootNode.Name} -> {rootNode_Read.Name} {Environment.NewLine}"
-                + $"    Value: {rootNode.Value} -> {rootNode_Read.Value}"
+                + $"    Name: {rootNode.Name} -> {rootNodeRead.Name} {Environment.NewLine}"
+                + $"    Value: {rootNode.Value} -> {rootNodeRead.Value}"
             );
 
         // And let's do that to each of our node. But we should check if that child node exists before doing it.
-        if (rootNode_Read.Count <= 0)
+        if (rootNodeRead.Count <= 0)
         {
             Console.WriteLine(
                 "The child nodes are gone. Something bad happened to our Fluxion nodes."
@@ -112,21 +119,21 @@ public static class Program
         }
         else
         {
-            var node1_read = rootNode_Read[0];
-            if (Equals(node1.Name, node1_read.Name) && Equals(node1.Value, node1_read.Value))
+            var node1Read = rootNodeRead[0];
+            if (Equals(node1.Name, node1Read.Name) && Equals(node1.Value, node1Read.Value))
                 Console.WriteLine("The first nodes' names and values are same!");
             else
                 Console.WriteLine(
                     $"The first nodes are not same, {Environment.NewLine}"
-                    + $"    Name: {node1.Name} -> {node1_read.Name} {Environment.NewLine}"
-                    + $"    Value: {node1.Value} -> {node1_read.Value}"
+                    + $"    Name: {node1.Name} -> {node1Read.Name} {Environment.NewLine}"
+                    + $"    Value: {node1.Value} -> {node1Read.Value}"
                 );
 
             // Let's check the attributes as well.
-            for (var attr_i = 0; attr_i < node1.Attributes.Count; attr_i++)
-                if (node1.Attributes[attr_i] is { } attr1)
+            for (var attrI = 0; attrI < node1.Attributes.Count; attrI++)
+                if (node1.Attributes[attrI] is { } attr1)
                 {
-                    if (node1_read.Attributes[attr1.Name] is { } attr2)
+                    if (node1Read.Attributes[attrI] is { } attr2)
                         Console.WriteLine(
                             Equals(attr1.Value, attr2.Value)
                                 ? $"Attribute \"{attr1.Name}\" is same in both attributes."
@@ -138,7 +145,7 @@ public static class Program
                         );
                 }
 
-            if (node1_read.Count <= 0)
+            if (node1Read.Count <= 0)
             {
                 Console.WriteLine(
                     "This child nodes of our first node are gone. Something bad happened to our Fluxion nodes."
@@ -146,22 +153,22 @@ public static class Program
             }
             else
             {
-                var node1_1_read = node1_read[0];
+                var node11Read = node1Read[0];
                 if (
-                    Equals(node1_1.Name, node1_1_read.Name)
-                    && Equals(node1_1.Value, node1_1_read.Value)
+                    Equals(node11.Name, node11Read.Name)
+                    && Equals(node11.Value, node11Read.Value)
                 )
                     Console.WriteLine("The first nodes' names and values are same!");
                 else
                     Console.WriteLine(
                         $"The first nodes are not same, {Environment.NewLine}"
-                        + $"    Name: {node1_1.Name} -> {node1_1_read.Name} {Environment.NewLine}"
-                        + $"    Value: {node1_1.Value} -> {node1_1_read.Value}"
+                        + $"    Name: {node11.Name} -> {node11Read.Name} {Environment.NewLine}"
+                        + $"    Value: {node11.Value} -> {node11Read.Value}"
                     );
-                for (var attr_i = 0; attr_i < node1_1.Attributes.Count; attr_i++)
-                    if (node1_1.Attributes[attr_i] is { } attr1)
+                for (var attrI = 0; attrI < node11.Attributes.Count; attrI++)
+                    if (node11.Attributes[attrI] is { } attr1)
                     {
-                        if (node1_1_read.Attributes[attr1.Name] is { } attr2)
+                        if (node11Read.Attributes[attrI] is { } attr2)
                             Console.WriteLine(
                                 Equals(attr1.Value, attr2.Value)
                                     ? $"Attribute \"{attr1.Name}\" is same in both attributes."
@@ -228,20 +235,38 @@ public static class Program
 
         var ymlSize = encoding.GetBytes(yml).Length;
 
-        // Let's encode it with a newer (or current) Fluxion version.
-        long flx2size;
+        // Let's encode it with a newer Fluxion version.
+        long flx2Size;
         using (var stream = new MemoryStream())
         {
-            rootNode.Write(stream, encoding);
-            flx2size = stream.Length;
+            rootNode.Write(new FluxionWriteOptions
+            {
+                Stream = stream,
+                Version = 2
+            });
+            flx2Size = stream.Length;
+        }
+
+        // Let's encode it with an even newer (or current) Fluxion version.
+        long flx3Size;
+        using (var stream = new MemoryStream())
+        {
+            rootNode.Write(new FluxionWriteOptions
+            {
+                Stream = stream,
+                Version = 3
+            });
+
+            flx3Size = stream.Length;
         }
 
         // Finally, let's print them all out to the console.
 
         Console.WriteLine(
             $"Sizes (in bytes) {Environment.NewLine}"
-            + $"  - Fluxion (v1): {fluxion_size} {Environment.NewLine}"
-            + $"  - Fluxion (v{Fluxion.Version}): {flx2size} {Environment.NewLine}"
+            + $"  - Fluxion (v1): {fluxionSize} {Environment.NewLine}"
+            + $"  - Fluxion (v2): {flx2Size} {Environment.NewLine}"
+            + $"  - Fluxion (v{Fluxion.Version}): {flx3Size} {Environment.NewLine}"
             + $"  - XML: {xmlSize} {Environment.NewLine}"
             + $"  - JSON: {jsonSize} {Environment.NewLine}"
             + $"  - YML: {ymlSize} {Environment.NewLine}"
