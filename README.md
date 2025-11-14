@@ -1,5 +1,7 @@
 # FluxionSharp
 
+My cringe attempt at making a data storage format that "should've been better than XML or JSON" but obviously it failed so I'm archiving. Also I'm abandoning C# from my life and might only try it once again but in C++. 
+
 This is the C# implementation of the Fluxion nodal data system. The code is always complete with the latest Fluxion
 standard.
 
