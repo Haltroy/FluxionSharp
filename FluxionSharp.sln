@@ -4,6 +4,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxionSharp", "FluxionShar
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxionSharp.Demo", "FluxionSharp.Demo\FluxionSharp.Demo.csproj", "{08E102ED-7600-4ED9-93A2-C0FD83B42B11}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FluxionTest", "FluxionTest\FluxionTest.csproj", "{251288D9-25E0-4A51-A7AA-38AB1791E4C1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -18,5 +20,9 @@ Global
 		{08E102ED-7600-4ED9-93A2-C0FD83B42B11}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{08E102ED-7600-4ED9-93A2-C0FD83B42B11}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{08E102ED-7600-4ED9-93A2-C0FD83B42B11}.Release|Any CPU.Build.0 = Release|Any CPU
+		{251288D9-25E0-4A51-A7AA-38AB1791E4C1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{251288D9-25E0-4A51-A7AA-38AB1791E4C1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{251288D9-25E0-4A51-A7AA-38AB1791E4C1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{251288D9-25E0-4A51-A7AA-38AB1791E4C1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 EndGlobal
